@@ -1,63 +1,74 @@
 import streamlit as st
-from PIL import Image
-import numpy as np
 import tensorflow as tf
-from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2, preprocess_input, decode_predictions
+import numpy as np
+from PIL import Image
+import requests
 
-# Load pre-trained model
-model = MobileNetV2(weights='imagenet')
+# Load pre-trained model (e.g., MobileNetV2)
+model = tf.keras.applications.MobileNetV2(weights="imagenet")
 
-# Function to classify image
-def classify_image(image):
-    img = image.resize((224, 224))
-    img_array = np.array(img)
-    img_array = np.expand_dims(img_array, axis=0)
-    img_array = preprocess_input(img_array)
-    predictions = model.predict(img_array)
-    decoded_predictions = decode_predictions(predictions, top=3)[0]
-    return decoded_predictions
+# Mapping ImageNet class IDs to human-readable labels
+imagenet_labels = np.array(open('imagenet_labels.txt').read().splitlines())
 
-# Streamlit app
-st.title("Clothing Classification and Brand Suggestion App")
+# Function to preprocess the image
+def preprocess_image(image):
+    image = image.resize((224, 224))
+    image = np.array(image)
+    image = np.expand_dims(image, axis=0)
+    image = tf.keras.applications.mobilenet_v2.preprocess_input(image)
+    return image
 
-uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
+# Function to get predictions
+def get_predictions(image):
+    preprocessed_image = preprocess_image(image)
+    predictions = model.predict(preprocessed_image)
+    top_pred_idx = np.argmax(predictions)
+    top_pred_label = imagenet_labels[top_pred_idx]
+    return top_pred_label
+
+# Function to search brand if not identified
+def search_brand(clothing_item):
+    url = f"https://api.example.com/search?q={clothing_item}"
+    response = requests.get(url)
+    if response.status_code == 200:
+        data = response.json()
+        if data and 'brand' in data:
+            return data['brand']
+    return "Brand not found"
+
+# Extended list of known brands
+known_brands = [
+    "Nike", "Adidas", "Puma", "Reebok", "Under Armour", "Levi's", "Gap", "H&M", "Zara", "Uniqlo",
+    "Gucci", "Prada", "Versace", "Louis Vuitton", "Chanel", "Hermes", "Dior", "Burberry", "Ralph Lauren",
+    "Tommy Hilfiger", "Calvin Klein", "Michael Kors", "Hugo Boss", "Armani", "Dolce & Gabbana", "Fendi",
+    "Balenciaga", "Saint Laurent", "Valentino", "Givenchy", "Kenzo", "Lacoste", "Supreme", "Off-White",
+    "Stone Island", "Moncler", "Patagonia", "North Face", "Columbia", "Converse", "New Balance",
+    "Vans", "Timberland", "Dr. Martens", "Brooks Brothers", "Abercrombie & Fitch", "Hollister", "Aeropostale",
+    "Diesel", "Guess", "Bvlgari", "Tory Burch", "Kate Spade", "Marc Jacobs", "Coach", "Vera Wang", "Stella McCartney",
+    "Alexander McQueen", "Vivienne Westwood", "Jean Paul Gaultier", "Karl Lagerfeld", "Moschino", "Miu Miu",
+    "Salvatore Ferragamo", "Ermenegildo Zegna", "Brioni", "Canali", "Giorgio Armani", "Paul Smith", "Ted Baker",
+    "Fred Perry", "J.Crew", "Banana Republic", "Lululemon", "Alo Yoga", "Gymshark", "Fila", "ASICS",
+    "Marmot", "Spyder", "Helly Hansen", "Barbour", "Gore-Tex", "Arc'teryx", "Canada Goose", "Eddie Bauer",
+    "LL Bean", "Carhartt", "Dickies", "Wrangler", "Lee", "Dockers", "Champion", "Russell Athletic", "Fila"
+]
+
+# Streamlit UI
+st.title("Clothes Classifier and Brand Recognizer")
+
+uploaded_file = st.file_uploader("Choose a PNG image", type="png")
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
     st.image(image, caption='Uploaded Image.', use_column_width=True)
     st.write("")
     st.write("Classifying...")
+    
+    label = get_predictions(image)
+    st.write(f"Identified clothing item: {label}")
+    
+    # Identify brand
+    brand = None
+    for known_brand in known_brands:
+        if known_brand.lower() in label.lower():
+            brand = known_bra
 
-    predictions = classify_image(image)
-
-    for pred in predictions:
-        st.write(f"Predicted: {pred[1]} with confidence {pred[2]*100:.2f}%")
-
-        # Brand suggestions based on predictions
-        if "t-shirt" in pred[1].lower():
-            st.write("You might like t-shirts from ASKET, Ash & Erie, H&M, Lululemon, or Carhartt.")
-        elif "longsleeve" in pred[1].lower():
-            st.write("You might like long sleeve shirts from Foret or Wax London.")
-        elif "pants" in pred[1].lower():
-            st.write("You might like pants from Levi's, Bonobos, or Lululemon.")
-        elif "shoes" in pred[1].lower():
-            st.write("You might like shoes from Nike, Adidas, or New Balance.")
-        elif "shirt" in pred[1].lower():
-            st.write("You might like shirts from Hugo Boss, Charles Tyrwhitt, Burberry, or Ralph Lauren.")
-        elif "dress" in pred[1].lower():
-            st.write("You might like dresses from Zara, Reformation, or Diane von Furstenberg.")
-        elif "outwear" in pred[1].lower():
-            st.write("You might like outerwear from The North Face, Patagonia, or Canada Goose.")
-        elif "scarf" in pred[1].lower():
-            st.write("You might like scarves from Hermes, Burberry, or Gucci.")
-        # Add more clothing items and their respective brands as needed
-
-    st.write("If no brand was detected, we suggest the following brands:")
-    st.write("For t-shirts: ASKET, Ash & Erie, H&M, Lululemon, Carhartt")
-    st.write("For long sleeve shirts: Foret, Wax London")
-    st.write("For pants: Levi's, Bonobos, Lululemon")
-    st.write("For shoes: Nike, Adidas, New Balance")
-    st.write("For shirts: Hugo Boss, Charles Tyrwhitt, Burberry, Ralph Lauren")
-    st.write("For dresses: Zara, Reformation, Diane von Furstenberg")
-    st.write("For outerwear: The North Face, Patagonia, Canada Goose")
-    st.write("For scarves: Hermes, Burberry, Gucci")
