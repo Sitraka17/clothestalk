@@ -7,9 +7,6 @@ import requests
 # Load pre-trained model (e.g., MobileNetV2)
 model = tf.keras.applications.MobileNetV2(weights="imagenet")
 
-# Mapping ImageNet class IDs to human-readable labels
-imagenet_labels = np.array(open('imagenet_labels.txt').read().splitlines())
-
 # Function to preprocess the image
 def preprocess_image(image):
     image = image.resize((224, 224))
@@ -18,12 +15,17 @@ def preprocess_image(image):
     image = tf.keras.applications.mobilenet_v2.preprocess_input(image)
     return image
 
+# Function to decode predictions
+def decode_predictions(preds, top=1):
+    from tensorflow.keras.applications.imagenet_utils import decode_predictions as tf_decode_predictions
+    return tf_decode_predictions(preds, top=top)
+
 # Function to get predictions
 def get_predictions(image):
     preprocessed_image = preprocess_image(image)
     predictions = model.predict(preprocessed_image)
-    top_pred_idx = np.argmax(predictions)
-    top_pred_label = imagenet_labels[top_pred_idx]
+    decoded_predictions = decode_predictions(predictions, top=1)
+    top_pred_label = decoded_predictions[0][0][1]
     return top_pred_label
 
 # Function to search brand if not identified
@@ -70,5 +72,10 @@ if uploaded_file is not None:
     brand = None
     for known_brand in known_brands:
         if known_brand.lower() in label.lower():
-            brand = known_bra
-
+            brand = known_brand
+            break
+    
+    if not brand:
+        brand = search_brand(label)
+    
+    st.write(f"Identified brand: {brand}")
