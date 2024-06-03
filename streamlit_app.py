@@ -1,20 +1,14 @@
 import streamlit as st
 from PIL import Image
 import numpy as np
+import tensorflow as tf
+from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2, preprocess_input, decode_predictions
 
-# Trying to import TensorFlow, fallback to PyTorch if it fails
-try:
-    import tensorflow as tf
-    from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2, preprocess_input, decode_predictions
-    tf_installed = True
-except ModuleNotFoundError:
-    import torch
-    import torchvision.transforms as transforms
-    from torchvision import models
-    tf_installed = False
+# Load pre-trained model
+model = MobileNetV2(weights='imagenet')
 
-# Function to classify image using TensorFlow
-def classify_image_tf(image):
+# Function to classify image
+def classify_image(image):
     img = image.resize((224, 224))
     img_array = np.array(img)
     img_array = np.expand_dims(img_array, axis=0)
@@ -22,31 +16,6 @@ def classify_image_tf(image):
     predictions = model.predict(img_array)
     decoded_predictions = decode_predictions(predictions, top=3)[0]
     return decoded_predictions
-
-# Function to classify image using PyTorch
-def classify_image_torch(image):
-    transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
-    img = transform(image).unsqueeze(0)
-    with torch.no_grad():
-        outputs = model(img)
-    _, indices = torch.sort(outputs, descending=True)
-    percentage = torch.nn.functional.softmax(outputs, dim=1)[0] * 100
-    classes = [(idx.item(), percentage[idx].item()) for idx in indices[0][:3]]
-    return classes
-
-# Load pre-trained model
-if tf_installed:
-    model = MobileNetV2(weights='imagenet')
-else:
-    model = models.mobilenet_v2(pretrained=True)
-    model.eval()
-    LABELS_URL = "https://raw.githubusercontent.com/anishathalye/imagenet-simple-labels/master/imagenet-simple-labels.json"
-    import requests
-    labels = requests.get(LABELS_URL).json()
 
 # Streamlit app
 st.title("Clothing Classification and Brand Suggestion App")
@@ -59,23 +28,36 @@ if uploaded_file is not None:
     st.write("")
     st.write("Classifying...")
 
-    if tf_installed:
-        predictions = classify_image_tf(image)
-        for pred in predictions:
-            st.write(f"Predicted: {pred[1]} with confidence {pred[2]*100:.2f}%")
-            if "shirt" in pred[1].lower():
-                st.write("You might like shirts from Hugo Boss or Charles Tyrwhitt UK.")
-            elif "scarf" in pred[1].lower():
-                st.write("You might like scarves from Hermes.")
-    else:
-        predictions = classify_image_torch(image)
-        for idx, confidence in predictions:
-            st.write(f"Predicted: {labels[idx]} with confidence {confidence:.2f}%")
-            if "shirt" in labels[idx].lower():
-                st.write("You might like shirts from Hugo Boss or Charles Tyrwhitt UK.")
-            elif "scarf" in labels[idx].lower():
-                st.write("You might like scarves from Hermes.")
+    predictions = classify_image(image)
+
+    for pred in predictions:
+        st.write(f"Predicted: {pred[1]} with confidence {pred[2]*100:.2f}%")
+
+        # Brand suggestions based on predictions
+        if "t-shirt" in pred[1].lower():
+            st.write("You might like t-shirts from ASKET, Ash & Erie, H&M, Lululemon, or Carhartt.")
+        elif "longsleeve" in pred[1].lower():
+            st.write("You might like long sleeve shirts from Foret or Wax London.")
+        elif "pants" in pred[1].lower():
+            st.write("You might like pants from Levi's, Bonobos, or Lululemon.")
+        elif "shoes" in pred[1].lower():
+            st.write("You might like shoes from Nike, Adidas, or New Balance.")
+        elif "shirt" in pred[1].lower():
+            st.write("You might like shirts from Hugo Boss, Charles Tyrwhitt, Burberry, or Ralph Lauren.")
+        elif "dress" in pred[1].lower():
+            st.write("You might like dresses from Zara, Reformation, or Diane von Furstenberg.")
+        elif "outwear" in pred[1].lower():
+            st.write("You might like outerwear from The North Face, Patagonia, or Canada Goose.")
+        elif "scarf" in pred[1].lower():
+            st.write("You might like scarves from Hermes, Burberry, or Gucci.")
+        # Add more clothing items and their respective brands as needed
 
     st.write("If no brand was detected, we suggest the following brands:")
-    st.write("For shirts: Hugo Boss, Charles Tyrwhitt UK")
-    st.write("For scarves: Hermes")
+    st.write("For t-shirts: ASKET, Ash & Erie, H&M, Lululemon, Carhartt")
+    st.write("For long sleeve shirts: Foret, Wax London")
+    st.write("For pants: Levi's, Bonobos, Lululemon")
+    st.write("For shoes: Nike, Adidas, New Balance")
+    st.write("For shirts: Hugo Boss, Charles Tyrwhitt, Burberry, Ralph Lauren")
+    st.write("For dresses: Zara, Reformation, Diane von Furstenberg")
+    st.write("For outerwear: The North Face, Patagonia, Canada Goose")
+    st.write("For scarves: Hermes, Burberry, Gucci")
